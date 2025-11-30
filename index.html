@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procedural Engine Simulator M3</title>
+    <style>
+        :root {
+            /* Material 3 Expressive Color Tokens (Dark Theme) */
+            --md-sys-color-surface: #141218;
+            --md-sys-color-on-surface: #E6E0E9;
+            --md-sys-color-surface-container: #1D1B20;
+            --md-sys-color-surface-container-high: #2B2930;
+            --md-sys-color-primary: #D0BCFF;
+            --md-sys-color-on-primary: #381E72;
+            --md-sys-color-secondary: #CCC2DC;
+            --md-sys-color-on-secondary: #332D41;
+            --md-sys-color-tertiary: #EFB8C8;
+            --md-sys-color-error: #F2B8B5;
+            --md-sys-color-outline: #938F99;
+            --font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+        
+        body {
+            background-color: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- Header --- */
+        header {
+            background-color: var(--md-sys-color-surface-container);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--md-sys-color-outline);
+        }
+
+        h1 { margin: 0; font-size: 1.25rem; font-weight: 500; }
+        
+        .status-bar { font-family: monospace; font-size: 0.8rem; color: var(--md-sys-color-secondary); }
+
+        /* --- Main Layout --- */
+        main {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* --- Sidebar Controls --- */
+        aside {
+            background-color: var(--md-sys-color-surface-container);
+            overflow-y: auto;
+            border-right: 1px solid var(--md-sys-color-outline);
+            padding-bottom: 80px;
+        }
+
+        .control-group {
+            padding: 16px;
+            border-bottom: 1px solid #333;
+        }
+
+        .control-group h3 {
+            margin-top: 0;
+            font-size: 0.9rem;
+            color: var(--md-sys-color-primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .input-wrapper {
+            margin-bottom: 12px;
+        }
+
+        .input-wrapper label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--md-sys-color-primary);
+            height: 4px;
+            background: var(--md-sys-color-surface-container-high);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px;
+            background: var(--md-sys-color-surface-container-high);
+            color: white;
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: 4px;
+        }
+
+        /* --- Dashboard / Visualization --- */
+        #dashboard {
+            position: relative;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        .card {
+            background: var(--md-sys-color-surface-container-high);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .canvas-container {
+            width: 100%;
+            height: 300px;
+            position: relative;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            background: #111;
+        }
+
+        .gauges {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 16px;
+        }
+
+        .gauge-text {
+            text-align: center;
+        }
+        .gauge-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--md-sys-color-primary);
+        }
+        .gauge-label {
+            font-size: 0.8rem;
+            color: var(--md-sys-color-secondary);
+        }
+
+        /* --- Start Button Overlay --- */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        button.fab {
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border: none;
+            padding: 16px 32px;
+            border-radius: 28px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            transition: transform 0.2s;
+        }
+        button.fab:active { transform: scale(0.95); }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .preset-btn {
+            background: transparent;
+            border: 1px solid var(--md-sys-color-outline);
+            color: var(--md-sys-color-on-surface);
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .preset-btn:hover { background: rgba(255,255,255,0.1); }
+
+        /* --- Mobile --- */
+        @media (max-width: 768px) {
+            main { grid-template-columns: 1fr; }
+            aside { display: none; /* In a full app, this would be a drawer */ }
+            /* For this demo, we stack them */
+            main { display: flex; flex-direction: column-reverse; overflow-y: scroll; }
+            aside { display: block; height: auto; border-right: none; border-top: 1px solid #333; }
+            .canvas-container { height: 200px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="overlay">
+    <h2 style="margin-bottom: 2rem;">Engine Simulator</h2>
+    <button class="fab" id="startBtn">START ENGINE</button>
+    <p style="margin-top: 1rem; color: #aaa;">Warning: Audio may be loud.</p>
+</div>
+
+<header>
+    <h1>EngineSim <span style="font-size: 0.8rem; opacity: 0.7;">v1.0</span></h1>
+    <div class="status-bar" id="statusBar">STOPPED</div>
+</header>
+
+<main>
+    <aside id="controls">
+        <div class="control-group">
+            <h3>Presets</h3>
+            <div class="preset-grid">
+                <button class="preset-btn" onclick="applyPreset('2jz')">2JZ-GTE</button>
+                <button class="preset-btn" onclick="applyPreset('rb26')">RB26DETT</button>
+                <button class="preset-btn" onclick="applyPreset('ls3')">LS3 V8</button>
+                <button class="preset-btn" onclick="applyPreset('f1')">F1 V10</button>
+                <button class="preset-btn" onclick="applyPreset('ej25')">EJ25 Boxer</button>
+                <button class="preset-btn" onclick="applyPreset('diesel')">Truck Diesel</button>
+            </div>
+        </div>
+
+        <!-- Controls generated dynamically by JS to handle complexity -->
+        <div id="dynamicControls"></div>
+    </aside>
+
+    <div id="dashboard">
+        <!-- Live Gauges -->
+        <div class="card gauges">
+            <div class="gauge-text">
+                <div class="gauge-value" id="val-rpm">0</div>
+                <div class="gauge-label">RPM</div>
+            </div>
+            <div class="gauge-text">
+                <div class="gauge-value" id="val-boost">0.0</div>
+                <div class="gauge-label">Boost (PSI)</div>
+            </div>
+            <div class="gauge-text">
+                <div class="gauge-value" id="val-tq">0</div>
+                <div class="gauge-label">Torque (Nm)</div>
+            </div>
+            <div class="gauge-text">
+                <div class="gauge-value" id="val-hp">0</div>
+                <div class="gauge-label">Power (HP)</div>
+            </div>
+            <div class="gauge-text">
+                <div class="gauge-value" id="val-afr">14.7</div>
+                <div class="gauge-label">AFR</div>
+            </div>
+            <div class="gauge-text">
+                <div class="gauge-value" id="val-temp">25</div>
+                <div class="gauge-label">Temp (°C)</div>
+            </div>
+        </div>
+
+        <!-- Graphs -->
+        <div class="card">
+            <h3 style="margin: 0 0 10px 0; font-size: 0.9rem; color:#aaa;">Dyno Graph (Theoretical) & Real-time Point</h3>
+            <div class="canvas-container">
+                <canvas id="dynoCanvas"></canvas>
+            </div>
+        </div>
+        
+        <div class="card">
+             <div class="input-wrapper">
+                <label><span>Throttle</span> <span id="lbl-throttle">0%</span></label>
+                <input type="range" id="throttleInput" min="0" max="100" value="0">
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+/**
+ * ------------------------------------------------------------------
+ * CONFIGURATION & STATE
+ * ------------------------------------------------------------------
+ */
+const PARAM_DEFS = [
+    { group: "Block", id: "cylinders", label: "Cylinders", min: 1, max: 12, step: 1, val: 6 },
+    { group: "Block", id: "displacement", label: "Displacement (L)", min: 1.0, max: 8.0, step: 0.1, val: 3.0 },
+    { group: "Block", id: "bore", label: "Bore (mm)", min: 70, max: 110, step: 0.1, val: 86 },
+    { group: "Block", id: "stroke", label: "Stroke (mm)", min: 60, max: 110, step: 0.1, val: 86 },
+    { group: "Block", id: "compression", label: "Compression Ratio", min: 7.0, max: 16.0, step: 0.1, val: 8.5 },
+    { group: "Block", id: "friction", label: "Friction Coef", min: 0.05, max: 0.5, step: 0.01, val: 0.15 },
+    
+    { group: "Head & Valve", id: "redline", label: "Redline RPM", min: 4000, max: 12000, step: 100, val: 7200 },
+    { group: "Head & Valve", id: "idleRpm", label: "Idle RPM", min: 600, max: 1500, step: 50, val: 850 },
+    { group: "Head & Valve", id: "camAggro", label: "Cam Aggressiveness", min: 0, max: 1, step: 0.01, val: 0.4 },
+    { group: "Head & Valve", id: "volEffPeak", label: "Peak Vol. Eff (%)", min: 70, max: 120, step: 1, val: 95 },
+    
+    { group: "Induction", id: "turboEnabled", label: "Turbocharged (0/1)", min: 0, max: 1, step: 1, val: 1 },
+    { group: "Induction", id: "maxBoost", label: "Max Boost (PSI)", min: 0, max: 40, step: 0.5, val: 14.0 },
+    { group: "Induction", id: "turboLag", label: "Turbo Lag (Inertia)", min: 0.1, max: 2.0, step: 0.1, val: 0.8 },
+    { group: "Induction", id: "intercooler", label: "Intercooler Eff.", min: 0.5, max: 1.0, step: 0.01, val: 0.8 },
+    
+    { group: "Physics", id: "flywheel", label: "Flywheel Mass", min: 1, max: 20, step: 0.5, val: 8 },
+    { group: "Physics", id: "load", label: "Drivetrain Load", min: 0, max: 100, step: 1, val: 10 },
+    
+    { group: "Fuel & Ignition", id: "timing", label: "Ignition Timing (Adv)", min: 0, max: 50, step: 1, val: 15 },
+    { group: "Fuel & Ignition", id: "afrTarget", label: "Target AFR", min: 10, max: 18, step: 0.1, val: 12.5 },
+];
+
+const PRESETS = {
+    '2jz': { cylinders: 6, displacement: 3.0, bore: 86, stroke: 86, redline: 7200, turboEnabled: 1, maxBoost: 18, camAggro: 0.4, flywheel: 9, idleRpm: 750, val: 6 },
+    'rb26': { cylinders: 6, displacement: 2.6, bore: 86, stroke: 73.7, redline: 8000, turboEnabled: 1, maxBoost: 14, camAggro: 0.6, flywheel: 7, idleRpm: 950 },
+    'ls3': { cylinders: 8, displacement: 6.2, bore: 103.2, stroke: 92, redline: 6600, turboEnabled: 0, maxBoost: 0, camAggro: 0.5, flywheel: 12, idleRpm: 600 },
+    'f1': { cylinders: 10, displacement: 3.0, bore: 90, stroke: 40, redline: 18000, turboEnabled: 0, maxBoost: 0, camAggro: 0.95, flywheel: 2, idleRpm: 4000, friction: 0.08 },
+    'ej25': { cylinders: 4, displacement: 2.5, bore: 99.5, stroke: 79, redline: 7000, turboEnabled: 1, maxBoost: 16, camAggro: 0.3, flywheel: 10, idleRpm: 750 },
+    'diesel': { cylinders: 6, displacement: 6.7, bore: 107, stroke: 124, redline: 3500, turboEnabled: 1, maxBoost: 30, camAggro: 0.1, flywheel: 25, idleRpm: 600, compression: 17 }
+};
+
+let engineState = {};
+// Initialize state
+PARAM_DEFS.forEach(p => engineState[p.id] = p.val);
+
+// Real-time Physics Variables
+let P = {
+    rpm: 0,
+    throttle: 0, // 0 to 1
+    boost: 0,    // Current PSI
+    turboSpool: 0, // 0 to 1
+    temp: 25,    // Celsius
+    loadTorque: 0,
+    timestamp: 0,
+    crankAngle: 0
+};
+
+// Audio Context
+let actx;
+let masterGain;
+let oscillatorBank = [];
+let noiseNode;
+let turboNode;
+
+/**
+ * ------------------------------------------------------------------
+ * UI GENERATION
+ * ------------------------------------------------------------------
+ */
+function initUI() {
+    const container = document.getElementById('dynamicControls');
+    const groups = {};
+
+    PARAM_DEFS.forEach(p => {
+        if (!groups[p.group]) {
+            groups[p.group] = document.createElement('div');
+            groups[p.group].className = 'control-group';
+            groups[p.group].innerHTML = `<h3>${p.group}</h3>`;
+            container.appendChild(groups[p.group]);
+        }
+        
+        const wrapper = document.createElement('div');
+        wrapper.className = 'input-wrapper';
+        wrapper.innerHTML = `
+            <label><span>${p.label}</span> <span id="disp_${p.id}">${p.val}</span></label>
+            <input type="range" id="in_${p.id}" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.val}">
+        `;
+        groups[p.group].appendChild(wrapper);
+
+        // Event Listener
+        document.getElementById(`in_${p.id}`).addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            engineState[p.id] = val;
+            document.getElementById(`disp_${p.id}`).innerText = val;
+            if(p.id === 'cylinders') setupAudio(); // Rebuild audio graph if cylinders change
+        });
+    });
+
+    // Throttle Listener
+    const throt = document.getElementById('throttleInput');
+    throt.addEventListener('input', (e) => {
+        P.throttle = parseFloat(e.target.value) / 100;
+        document.getElementById('lbl-throttle').innerText = Math.round(P.throttle * 100) + '%';
+    });
+
+    document.getElementById('startBtn').addEventListener('click', async () => {
+        document.getElementById('overlay').style.display = 'none';
+        await initAudio();
+        startSimulation();
+    });
+}
+
+function applyPreset(key) {
+    const pre = PRESETS[key];
+    if (!pre) return;
+    for (let k in pre) {
+        engineState[k] = pre[k];
+        const el = document.getElementById(`in_${k}`);
+        if (el) {
+            el.value = pre[k];
+            document.getElementById(`disp_${k}`).innerText = pre[k];
+        }
+    }
+    setupAudio();
+}
+
+/**
+ * ------------------------------------------------------------------
+ * PHYSICS ENGINE
+ * ------------------------------------------------------------------
+ */
+function getVolumetricEfficiency(rpm) {
+    // Simplified curve: Low at idle, peaks at cam sweet spot, drops at redline
+    const peakRpm = engineState.redline * (0.6 + (engineState.camAggro * 0.2));
+    const normalized = rpm / peakRpm;
+    // Bell curve approximation
+    let eff = engineState.volEffPeak * Math.exp(-Math.pow(normalized - 1, 2) * (2 - engineState.camAggro));
+    return Math.max(40, eff) / 100; // Return 0.4 to 1.2
+}
+
+function calculatePhysics(dt) {
+    // 1. Intake
+    // Turbo Logic
+    let targetBoost = 0;
+    if (engineState.turboEnabled) {
+        // Boost builds with RPM and Throttle (simplified exhaust flow proxy)
+        const exhaustFlow = P.rpm * P.throttle * engineState.displacement;
+        const spoolThreshold = engineState.redline * 0.3 * engineState.displacement;
+        
+        let spoolTarget = 0;
+        if (exhaustFlow > spoolThreshold) {
+            spoolTarget = (exhaustFlow - spoolThreshold) / (engineState.redline * engineState.displacement * 0.5);
+        }
+        spoolTarget = Math.min(1, spoolTarget * P.throttle);
+
+        // Lag implementation (Lerp)
+        const lagSpeed = 2.0 / engineState.turboLag; 
+        P.turboSpool += (spoolTarget - P.turboSpool) * lagSpeed * dt;
+        P.turboSpool = Math.max(0, P.turboSpool);
+        
+        targetBoost = P.turboSpool * engineState.maxBoost;
+    } else {
+        targetBoost = 0;
+        P.turboSpool = 0;
+    }
+    P.boost = targetBoost;
+
+    // Air Density & MAP
+    const atmospheric = 14.7; // PSI
+    const map = atmospheric + P.boost;
+    const airDensityRatio = map / atmospheric;
+
+    // 2. Combustion Torque
+    // Base torque = Displacement * VE * AirDensity
+    const ve = getVolumetricEfficiency(P.rpm);
+    
+    // Ideal torque per liter NA is roughly 80-100 Nm.
+    const baseTorquePerLiter = 90; // Nm
+    let idealTorque = engineState.displacement * baseTorquePerLiter * ve * airDensityRatio;
+    
+    // Throttle restriction (simplified butterfly valve flow)
+    // Non-linear throttle curve
+    const flow = Math.pow(P.throttle, 1.5); 
+    let generatedTorque = idealTorque * flow;
+
+    // 3. Friction & Pumping Losses
+    // Friction increases with RPM squared
+    const frictionLoss = (P.rpm * engineState.displacement * engineState.friction) / 20; 
+    // Pumping loss (vacuum) if throttle closed
+    const vacuumLoss = (1 - P.throttle) * (engineState.displacement * 20);
+    
+    // 4. Net Torque
+    let netTorque = generatedTorque - frictionLoss - vacuumLoss;
+
+    // 5. Load (Drivetrain + Rolling Resistance)
+    // Load increases with RPM (drag) + Static Load setting
+    const externalLoad = (engineState.load * 2) + (P.rpm * 0.01);
+    netTorque -= externalLoad;
+
+    // 6. Integration (Newton's 2nd Law for Rotation)
+    // Torque = Inertia * Alpha (Angular Accel)
+    // Alpha = Torque / Inertia
+    const inertia = engineState.flywheel + (engineState.displacement * 2); // Rough estimation
+    const alpha = netTorque / inertia; 
+    
+    // RPM update
+    P.rpm += alpha * dt * 60; // Convert rad/s^2 to RPM/s approx scaling (simplified)
+    
+    // Limits
+    if (P.rpm < 0) P.rpm = 0;
+    
+    // Rev Limiter (Hard cut)
+    if (P.rpm > engineState.redline) {
+        P.rpm = engineState.redline - 50; // Bounce
+        // Cut throttle effectively for sound
+        generatedTorque = 0; 
+    }
+
+    // Idle Control (Simple P-controller)
+    if (P.throttle < 0.05 && P.rpm < engineState.idleRpm) {
+        P.rpm += (engineState.idleRpm - P.rpm) * 5 * dt;
+    }
+
+    // Crank Angle
+    P.crankAngle += (P.rpm / 60) * 360 * dt;
+    if (P.crankAngle > 720) P.crankAngle -= 720;
+
+    // Thermal
+    // Heat up with load, cool down constantly
+    const heatGen = (P.rpm * 0.01 + P.boost * 2) * P.throttle * dt;
+    const cooling = (P.temp - 20) * (0.05 + (P.rpm*0.0001)) * dt; // Airflow cooling
+    P.temp += heatGen - cooling;
+    
+    // Update State for UI
+    P.torqueOutput = Math.max(0, netTorque + externalLoad); // Gross torque
+    P.hpOutput = (P.torqueOutput * P.rpm) / 5252 * 1.3558; // Nm to Ft-lbs conv for formula roughly, adjusted
+}
+
+/**
+ * ------------------------------------------------------------------
+ * AUDIO ENGINE
+ * ------------------------------------------------------------------
+ */
+async function initAudio() {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    actx = new AudioContext();
+    masterGain = actx.createGain();
+    masterGain.gain.value = 0.5;
+    masterGain.connect(actx.destination);
+
+    // Intake / Turbo Noise
+    const bufferSize = 2 * actx.sampleRate;
+    const noiseBuffer = actx.createBuffer(1, bufferSize, actx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+    }
+
+    noiseNode = actx.createBufferSource();
+    noiseNode.buffer = noiseBuffer;
+    noiseNode.loop = true;
+    const noiseFilter = actx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    noiseFilter.frequency.value = 400;
+    const noiseGain = actx.createGain();
+    noiseGain.gain.value = 0;
+    noiseNode.connect(noiseFilter).connect(noiseGain).connect(masterGain);
+    noiseNode.start();
+    
+    // Turbo Whine
+    turboNode = actx.createOscillator();
+    turboNode.type = 'sine';
+    turboNode.frequency.value = 2000;
+    const turboGain = actx.createGain();
+    turboGain.gain.value = 0;
+    turboNode.connect(turboGain).connect(masterGain);
+    turboNode.start();
+
+    P.audioNodes = { noiseGain, noiseFilter, turboGain, turboNode };
+    
+    setupAudio();
+}
+
+function setupAudio() {
+    if (!actx) return;
+    
+    // Clear old oscillators
+    oscillatorBank.forEach(o => {
+        o.osc.stop();
+        o.osc.disconnect();
+    });
+    oscillatorBank = [];
+
+    // Create an oscillator per cylinder (or a simplified cluster)
+    // To save CPU, we use 2 main oscillators for the harmonic series + modulation
+    // Procedural synthesis strategy: 
+    // Sawtooth (Fundamental) + Square (Harmonic) -> Lowpass -> Gain
+    
+    const count = 2; // Layers
+    for (let i = 0; i < count; i++) {
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        const filter = actx.createBiquadFilter();
+        
+        osc.type = i === 0 ? 'sawtooth' : 'square';
+        
+        // Filter simulates muffler
+        filter.type = 'lowpass';
+        filter.frequency.value = 500;
+        
+        osc.connect(filter).connect(gain).connect(masterGain);
+        osc.start();
+        
+        oscillatorBank.push({ osc, gain, filter, id: i });
+    }
+}
+
+function updateAudio() {
+    if (!actx) return;
+
+    const rpm = Math.max(100, P.rpm);
+    const cylinders = engineState.cylinders;
+    
+    // Fundamental frequency of firing events
+    // 4 stroke: RPM / 60 * Cylinders / 2
+    const fundFreq = (rpm / 60) * (cylinders / 2);
+    
+    // Random jitter for idle lope
+    const jitter = (Math.random() - 0.5) * (1500 / rpm); // More jitter at low rpm
+
+    oscillatorBank.forEach(layer => {
+        // Pitch
+        let multiplier = layer.id === 0 ? 1 : 1.5; // Harmonics
+        layer.osc.frequency.setTargetAtTime(fundFreq * multiplier + jitter, actx.currentTime, 0.05);
+        
+        // Filter opening with RPM
+        const filterFreq = 100 + (rpm * 1.5); 
+        layer.filter.frequency.setTargetAtTime(filterFreq, actx.currentTime, 0.1);
+        
+        // Volume modulation based on load
+        let vol = 0.1 + (P.throttle * 0.3);
+        if (layer.id === 1) vol *= 0.5;
+        layer.gain.gain.setTargetAtTime(vol, actx.currentTime, 0.1);
+    });
+
+    // Intake Noise
+    if (P.audioNodes) {
+        const flow = P.rpm * P.throttle;
+        P.audioNodes.noiseGain.gain.setTargetAtTime(flow / 20000, actx.currentTime, 0.1);
+        P.audioNodes.noiseFilter.frequency.setTargetAtTime(flow / 10, actx.currentTime, 0.1);
+        
+        // Turbo Whine
+        if (engineState.turboEnabled) {
+            const pitch = 2000 + (P.turboSpool * 8000);
+            const vol = P.turboSpool * 0.15;
+            P.audioNodes.turboNode.frequency.setTargetAtTime(pitch, actx.currentTime, 0.1);
+            P.audioNodes.turboGain.gain.setTargetAtTime(vol, actx.currentTime, 0.1);
+        } else {
+            P.audioNodes.turboGain.gain.value = 0;
+        }
+    }
+}
+
+/**
+ * ------------------------------------------------------------------
+ * VISUALIZATION & LOOP
+ * ------------------------------------------------------------------
+ */
+const dynoCanvas = document.getElementById('dynoCanvas');
+const dCtx = dynoCanvas.getContext('2d');
+
+function resizeCanvas() {
+    const rect = dynoCanvas.parentElement.getBoundingClientRect();
+    dynoCanvas.width = rect.width;
+    dynoCanvas.height = rect.height;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function drawDyno() {
+    const w = dynoCanvas.width;
+    const h = dynoCanvas.height;
+    dCtx.clearRect(0,0,w,h);
+
+    // Draw Grid
+    dCtx.strokeStyle = '#333';
+    dCtx.lineWidth = 1;
+    dCtx.beginPath();
+    for(let i=0; i<5; i++) {
+        let y = h - (h/5)*i;
+        dCtx.moveTo(0, y); dCtx.lineTo(w, y);
+    }
+    for(let i=0; i<10; i++) {
+        let x = (w/10)*i;
+        dCtx.moveTo(x, 0); dCtx.lineTo(x, h);
+    }
+    dCtx.stroke();
+
+    // Calculate theoretical curves for visualization
+    const steps = 50;
+    const maxRpm = engineState.redline + 500;
+    const maxTqEstimate = engineState.displacement * 150 * (engineState.turboEnabled ? 1 + (engineState.maxBoost/14.7) : 1);
+    
+    dCtx.lineWidth = 2;
+    
+    // Torque Curve (Yellow)
+    dCtx.strokeStyle = '#FFC107';
+    dCtx.beginPath();
+    for(let i=0; i<=steps; i++) {
+        let r = (i/steps) * maxRpm;
+        if (r < 100) continue;
+        
+        // Simulate torque calc for graph
+        let ve = getVolumetricEfficiency(r);
+        let boost = 0;
+        if(engineState.turboEnabled && r > 2500) {
+            boost = engineState.maxBoost; // Assume full boost for dyno line
+        }
+        let tq = engineState.displacement * 90 * ve * ((14.7+boost)/14.7);
+        // Friction deduction
+        tq -= (r * engineState.displacement * engineState.friction)/20;
+        
+        let x = (r / maxRpm) * w;
+        let y = h - ((tq / maxTqEstimate) * h * 0.8) - 10;
+        if(i===0) dCtx.moveTo(x,y); else dCtx.lineTo(x,y);
+    }
+    dCtx.stroke();
+
+    // HP Curve (Red)
+    dCtx.strokeStyle = '#F44336';
+    dCtx.beginPath();
+    for(let i=0; i<=steps; i++) {
+        let r = (i/steps) * maxRpm;
+        if (r < 100) continue;
+        
+        // Re-calc TQ
+        let ve = getVolumetricEfficiency(r);
+        let boost = 0;
+        if(engineState.turboEnabled && r > 2500) boost = engineState.maxBoost;
+        let tq = engineState.displacement * 90 * ve * ((14.7+boost)/14.7);
+        tq -= (r * engineState.displacement * engineState.friction)/20;
+
+        let hp = (tq * r) / 5252 * 1.35; // approx
+        
+        let x = (r / maxRpm) * w;
+        let y = h - ((hp / maxTqEstimate) * h * 0.8) - 10; // Scaling HP similar to TQ for visual
+        if(i===0) dCtx.moveTo(x,y); else dCtx.lineTo(x,y);
+    }
+    dCtx.stroke();
+
+    // Current RPM Dot
+    const cx = (P.rpm / maxRpm) * w;
+    const cy_tq = h - ((P.torqueOutput / maxTqEstimate) * h * 0.8) - 10;
+    
+    dCtx.fillStyle = '#FFF';
+    dCtx.beginPath();
+    dCtx.arc(cx, cy_tq, 5, 0, Math.PI*2);
+    dCtx.fill();
+    
+    // Legend
+    dCtx.fillStyle = '#FFC107';
+    dCtx.fillText("Torque", 10, 20);
+    dCtx.fillStyle = '#F44336';
+    dCtx.fillText("Power", 60, 20);
+}
+
+function updateUI() {
+    document.getElementById('val-rpm').innerText = Math.round(P.rpm);
+    document.getElementById('val-boost').innerText = P.boost.toFixed(1);
+    document.getElementById('val-tq').innerText = Math.round(P.torqueOutput);
+    document.getElementById('val-hp').innerText = Math.round(P.hpOutput);
+    document.getElementById('val-temp').innerText = Math.round(P.temp);
+    
+    // Simple AFR simulation
+    let afr = engineState.afrTarget;
+    if (P.throttle < 0.1) afr = 16.0; // Lean idle
+    if (P.throttle > 0.8) afr = 11.5; // Rich WOT
+    document.getElementById('val-afr').innerText = afr.toFixed(1);
+    
+    document.getElementById('statusBar').innerText = `STATUS: RUNNING | DT: ${Math.round(1000/60)}ms`;
+}
+
+// Main Loop
+let lastTime = 0;
+function loop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const dt = (timestamp - lastTime) / 1000; // Delta time in seconds
+    lastTime = timestamp;
+
+    calculatePhysics(dt);
+    updateAudio();
+    updateUI();
+    drawDyno();
+
+    requestAnimationFrame(loop);
+}
+
+function startSimulation() {
+    initUI(); // Initialize sliders
+    requestAnimationFrame(loop);
+}
+
+// Initial Setup
+initUI();
+resizeCanvas();
+
+</script>
+</body>
+</html>
